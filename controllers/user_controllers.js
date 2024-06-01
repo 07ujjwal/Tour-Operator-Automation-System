@@ -1,8 +1,15 @@
 const User = require('../model/user_model');
+const Features = require('../utils/api_features');
 const catchError = require('../utils/catch_error');
 
 exports.getAllUsers = catchError(async (req, res, next) => {
-  const users = await User.find();
+  const features = new Features(User.find(), req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+
+  const users = await features.query;
 
   res.status(200).json({
     status: 'success',
@@ -13,12 +20,17 @@ exports.getAllUsers = catchError(async (req, res, next) => {
   });
 });
 
-exports.getUser = (req, res) => {
-  res.status(500).json({
-    status: 'error',
-    message: 'This route is not yet defined!',
+exports.getUser = catchError(async (req, res) => {
+  const users = await User.findById(req.params.id);
+
+  res.status(200).json({
+    status: 'success',
+    results: users.length,
+    data: {
+      users,
+    },
   });
-};
+});
 
 ///looping throug the object which returns the array of keys... then looping through the array
 const filterRequestBody = (obj, ...allowedFields) => {
@@ -66,6 +78,11 @@ exports.updateUser = (req, res) => {
     status: 'error',
     message: 'This route is not yet defined!',
   });
+};
+
+exports.getMe = (req, res, next) => {
+  req.params.id = req.user.id;
+  next();
 };
 
 exports.deleteUser = catchError(async (req, res, next) => {

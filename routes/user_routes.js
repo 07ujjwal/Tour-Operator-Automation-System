@@ -21,6 +21,10 @@ router.patch('/resetPassword/:token', resetPassword);
 router.patch('/updateMyPassword', protect, updatePassword);
 router.patch('/updateLoginData', protect, user_controller.updateUserLoginData);
 
+router.get('/me', protect, user_controller.getMe, user_controller.getUser);
+
+router.use(protect, ristrictUser('admin'));
+
 router
   .route('/')
   .get(user_controller.getAllUsers)

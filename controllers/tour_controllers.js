@@ -1,7 +1,11 @@
+const multer = require('multer');
+const sharp = require('sharp');
 const Tour = require('../model/tour_model');
 const Features = require('../utils/api_features');
 const AppError = require('../utils/app_error');
 const catchError = require('../utils/catch_error');
+
+const multerStorage = multer.memoryStorage();
 
 exports.aliasTopTour = (req, res, next) => {
   req.query.limit = '5';
@@ -9,6 +13,74 @@ exports.aliasTopTour = (req, res, next) => {
   req.query.fields = 'name,price,ratingAverage,summary,difficulty';
   next();
 };
+
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Not an image! Please upload only images.', 400), false);
+  }
+};
+
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+});
+
+exports.uploadTourImages = upload.fields([
+  { name: 'imageCover', maxCount: 1 },
+  { name: 'images', maxCount: 3 },
+]);
+
+exports.resizeTourImages = catchError(async (req, res, next) => {
+  if (!req.files.imageCover || !req.files.images) return next();
+
+  // 1) Cover image
+  req.body.imageCover = `tour-${req.params.id}-${Date.now()}-cover.jpeg`;
+  await sharp(req.files.imageCover[0].buffer)
+    .resize(2000, 1333)
+    .toFormat('jpeg')
+    .jpeg({ quality: 90 })
+    .toFile(`uploads/img/${req.body.imageCover}`);
+
+  // 2) Images
+  req.body.images = [];
+
+  await Promise.all(
+    req.files.images.map(async (file, i) => {
+      const filename = `tour-${req.params.id}-${Date.now()}-${i + 1}.jpeg`;
+
+      await sharp(file.buffer)
+        .resize(2000, 1333)
+        .toFormat('jpeg')
+        .jpeg({ quality: 90 })
+        .toFile(`uploads/img/${filename}`);
+
+      req.body.images.push(filename);
+    })
+  );
+
+  next();
+});
+
+exports.updateTour = catchError(async (req, res, next) => {
+  // console.log(req.body);
+  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!tour) {
+    return next(new AppError('Invalid Tour Id', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+});
 
 exports.getAllTours = catchError(async (req, res, next) => {
   const features = new Features(Tour.find(), req.query)
@@ -27,7 +99,6 @@ exports.getAllTours = catchError(async (req, res, next) => {
     },
   });
 });
-
 
 exports.getToursWithin = catchError(async (req, res, next) => {
   const { distance, latlng, unit } = req.params;
@@ -60,7 +131,6 @@ exports.getToursWithin = catchError(async (req, res, next) => {
     },
   });
 });
-
 
 exports.getDistances = catchError(async (req, res, next) => {
   const { latlng, unit } = req.params;
@@ -125,24 +195,6 @@ exports.createTour = catchError(async (req, res, next) => {
     status: 'success',
     data: {
       tour: newTour,
-    },
-  });
-});
-
-exports.updateTour = catchError(async (req, res, next) => {
-  const tour = await Tour.findByIdAndUpdate(req.params.id, req.params.body, {
-    new: true,
-    runValidators: true,
-  });
-
-  if (!tour) {
-    return next(new AppError('Invalid Tour Id', 404));
-  }
-
-  res.status(200).json({
-    status: 'success',
-    data: {
-      tour,
     },
   });
 });

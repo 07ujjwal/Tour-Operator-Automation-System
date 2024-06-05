@@ -10,7 +10,7 @@ exports.createReview = catchError(async (req, res, next) => {
 
   const createdReview = await Review.create(newReview);
 
-  console.log(createdReview);
+  // console.log(createdReview);
 
   res.status(200).json({
     message: 'success',
@@ -87,5 +87,3 @@ exports.updateReview = catchError(async (req, res, next) => {
     },
   });
 });
-
-

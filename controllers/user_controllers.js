@@ -1,6 +1,44 @@
+const multer = require('multer');
+const sharp = require('sharp');
 const User = require('../model/user_model');
 const Features = require('../utils/api_features');
 const catchError = require('../utils/catch_error');
+const AppError = require('../utils/app_error');
+
+const multerStorage = multer.memoryStorage();
+
+// testing the type of upload file
+
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Not an image! Please upload only images.', 400), false);
+  }
+};
+
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+});
+
+// const upload = multer({ dest: 'uploads/userimg' });
+
+exports.uploadUserPhoto = upload.single('photo');
+
+exports.resizeUserPhoto = (req, res, next) => {
+  if (!req.file) return next();
+
+  req.file.filename = `user-${req.user.id}-${Date.now()}.jpeg`;
+
+  sharp(req.file.buffer)
+    .resize(500, 500)
+    .toFormat('jpeg')
+    .jpeg({ quality: 90 })
+    .toFile(`uploads/userimg/${req.file.filename}`);
+
+  next();
+};
 
 exports.getAllUsers = catchError(async (req, res, next) => {
   const features = new Features(User.find(), req.query)
@@ -41,7 +79,10 @@ const filterRequestBody = (obj, ...allowedFields) => {
   return newObject;
 };
 
-exports.updateUserLoginData = catchError(async (req, res) => {
+exports.updateUserData = catchError(async (req, res, next) => {
+  // console.log(req.body);
+  // console.log(req.file);
+
   if (req.body.password || req.body.passwordConfirm) {
     return next(
       new AppError(
@@ -51,9 +92,10 @@ exports.updateUserLoginData = catchError(async (req, res) => {
     );
   }
 
-  const filteredData = filterRequestBody(req.body, 'name', 'email');
+  const filteredBody = filterRequestBody(req.body, 'name', 'email');
+  if (req.file) filteredBody.photo = req.file.filename;
 
-  const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredData, {
+  const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
     new: true,
     runValidators: true,
   });
@@ -67,13 +109,6 @@ exports.updateUserLoginData = catchError(async (req, res) => {
 });
 
 exports.createUser = (req, res) => {
-  res.status(500).json({
-    status: 'error',
-    message: 'This route is not yet defined!',
-  });
-};
-
-exports.updateUser = (req, res) => {
   res.status(500).json({
     status: 'error',
     message: 'This route is not yet defined!',

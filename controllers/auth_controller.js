@@ -3,8 +3,8 @@ const User = require('../model/user_model');
 const AppError = require('../utils/app_error');
 const catchError = require('../utils/catch_error');
 const jwt = require('jsonwebtoken');
-const sendEmail = require('../utils/email');
 const crypto = require('crypto');
+const Email = require('../utils/email');
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -65,7 +65,9 @@ exports.logIn = catchError(async (req, res, next) => {
     return next(new AppError('No User Found', 401));
   }
 
-  if (!(await user.checkPassword(JSON.stringify(password), user.password))) {
+  // console.log(email, password);
+
+  if (!(await user.checkPassword(password, user.password))) {
     return next(new AppError('Incorrect Email or Password', 401));
   }
 
@@ -125,7 +127,7 @@ exports.forgotPassword = catchError(async (req, res, next) => {
   const user = await User.findOne({ email: req.body.email });
 
   if (!user) {
-    return next(new AppError('There is no useer with this email!', 404));
+    return next(new AppError('There is no user with this email!', 404));
   }
 
   const resetToken = user.createPasswordResetToken();
@@ -135,15 +137,8 @@ exports.forgotPassword = catchError(async (req, res, next) => {
     'host'
   )}/api/v1/users/resetPassword/${resetToken}`;
 
-  const message = `Forgot your password? Submit your new password and passwordConfirm to: ${resetURL}.\nIf you didn't forget your password, please ignore this email!`;
-  console.log(user.email);
-
   try {
-    await sendEmail({
-      email: user.email,
-      subject: 'Your password reset token (valid for 10 min)',
-      message,
-    });
+    await new Email(user, resetURL).sendPasswordReset();
 
     res.status(200).json({
       status: 'success',
@@ -155,11 +150,12 @@ exports.forgotPassword = catchError(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     return next(
-      new AppError('There was an error sending the email. Try again later!'),
-      500
+      new AppError(
+        'There was an error sending the email. Try again later!',
+        500
+      )
     );
   }
-  next();
 });
 
 exports.resetPassword = catchError(async (req, res, next) => {
@@ -173,7 +169,7 @@ exports.resetPassword = catchError(async (req, res, next) => {
     passwordResetExpires: { $gt: Date.now() },
   });
 
-  console.log(user);
+  // console.log(user);
 
   if (!user) {
     return next(new AppError('Token is invalid or has expired', 400));
@@ -192,7 +188,7 @@ exports.updatePassword = catchError(async (req, res, next) => {
     _id: req.user.id,
   }).select('+password');
 
-  console.log(req.user.id);
+  // console.log(req.user.id);
 
   const isPasswordCorrect = await user.checkPassword(
     req.body.passwordCurrent,

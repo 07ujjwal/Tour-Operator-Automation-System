@@ -3,6 +3,7 @@ const morgan = require('morgan');
 const tourRouter = require('./routes/tour_routes');
 const userRouter = require('./routes/user_routes');
 const reviewsRouter = require('./routes/reviews_router');
+const bookingRouter = require('./routes/booking_router');
 const AppError = require('./utils/app_error');
 const globalErrorHandler = require('./controllers/error_controller');
 const rateLimit = require('express-rate-limit');
@@ -10,15 +11,18 @@ const helmet = require('helmet');
 const xss = require('xss-clean');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
+const compression = require('compression');
 
 const app = express();
+
+app.use(compression());
 
 // Set security HTTP headers
 app.use(helmet());
 
 if (process.env.NODE_ENV === 'developement') {
   app.use(morgan('dev'));
-}
+} 
 
 // rate limiter.....
 const limiter = rateLimit({
@@ -50,6 +54,7 @@ app.use((req, res, next) => {
 app.use('/api/v1/tours', tourRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/reviews', reviewsRouter);
+app.use('/api/v1/bookings', bookingRouter);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));

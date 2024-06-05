@@ -16,7 +16,10 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Please provide a valid email'],
   },
-  photo: String,
+  photo: {
+    type: String,
+    default: 'default.jpg',
+  },
   userType: {
     type: String,
     enum: ['user', 'guide', 'lead-guide', 'admin'],
@@ -66,9 +69,9 @@ userSchema.pre('save', function (next) {
   next();
 });
 
-// instance method/// method that will be available  for all
-// methods in a certain collection....
-// this keyword points to the current dock....checkPassword
+// Instance method: A method that is available for all instances of the User model.
+// The 'this' keyword points to the current document (user instance).
+// 'this' refers to the current instance of the User model.
 
 userSchema.methods.checkPassword = async function (
   candidatePassword,
@@ -88,24 +91,29 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   return false;
 };
 
-//this is a random string which will be used as an
-// password for a short duration of time till the user stors his new password
-// this will then be stored in incripted form this db and send to user through
-// email... then the token entered by the user will be compared by the one in
-// database. and then the user will be allowed to change password...
+// This method generates a random string which will be used as a password reset token
+// for a short duration of time until the user sets their new password. The token
+// will be stored in an encrypted form in the database and sent to the user via email.
+// When the user enters the token, it will be compared with the encrypted token stored
+// in the database. If they match, the user will be allowed to change their password.
 
 userSchema.methods.createPasswordResetToken = function () {
+  // Generate a random reset token
   const resetToken = crypto.randomBytes(32).toString('hex');
 
+  // Encrypt the reset token and store it in the database
   this.passwordResetToken = crypto
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
 
-  console.log({ resetToken }, this.passwordResetToken);
+  // Log the plain reset token and the encrypted token for debugging purposes
+  // console.log({ resetToken }, this.passwordResetToken);
 
+  // Set the token expiration time to 10 minutes from now
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
 
+  // Return the plain reset token (to be sent to the user)
   return resetToken;
 };
 

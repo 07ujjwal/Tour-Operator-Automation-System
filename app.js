@@ -12,17 +12,30 @@ const xss = require('xss-clean');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const compression = require('compression');
+const cors = require('cors');
 
 const app = express();
 
 app.use(compression());
+
+app.use(cors());
+
+// if (process.env.NODE_ENV === 'development') {
+//   app.use(cors());
+// } else {
+//   app.use(cors({
+//     origin: 'domain',
+//     methods: 'GET,POST,PUT,DELETE',
+//     credentials: true
+//   }));
+// }
 
 // Set security HTTP headers
 app.use(helmet());
 
 if (process.env.NODE_ENV === 'developement') {
   app.use(morgan('dev'));
-} 
+}
 
 // rate limiter.....
 const limiter = rateLimit({

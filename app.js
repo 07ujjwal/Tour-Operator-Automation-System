@@ -29,6 +29,9 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Trust the proxy headers
+app.set('trust proxy', true);
+
 // Rate limiting
 const limiter = rateLimit({
   max: 100,

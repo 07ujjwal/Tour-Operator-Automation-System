@@ -1,80 +1,86 @@
 const express = require('express');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const compression = require('compression');
+const cors = require('cors');
 const tourRouter = require('./routes/tour_routes');
 const userRouter = require('./routes/user_routes');
 const reviewsRouter = require('./routes/reviews_router');
 const bookingRouter = require('./routes/booking_router');
 const AppError = require('./utils/app_error');
 const globalErrorHandler = require('./controllers/error_controller');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const xss = require('xss-clean');
-const mongoSanitize = require('express-mongo-sanitize');
-const hpp = require('hpp');
-const compression = require('compression');
-const cors = require('cors');
 
 const app = express();
 
-app.use(compression());
+// Global middleware stack
 
+// Enable CORS
 app.use(cors());
-
-// if (process.env.NODE_ENV === 'development') {
-//   app.use(cors());
-// } else {
-//   app.use(cors({
-//     origin: 'domain',
-//     methods: 'GET,POST,PUT,DELETE',
-//     credentials: true
-//   }));
-// }
 
 // Set security HTTP headers
 app.use(helmet());
 
-if (process.env.NODE_ENV === 'developement') {
+// Logging middleware for development
+if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// rate limiter.....
+// Rate limiting
 const limiter = rateLimit({
   max: 100,
-  windowMs: 60 * 60 * 1000,
+  windowMs: 60 * 60 * 1000, // 1 hour
   message: 'Too many requests from this IP, please try again in an hour!',
 });
+app.use('/api', limiter);
 
-// nosql query injection protection,,,,
+// Body parser, reading data from body into req.body
+app.use(express.json({ limit: '10kb' }));
+
+// Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
-// html code injection protection...
+
+// Data sanitization against XSS
 app.use(xss());
-// prevents parameter pollution...
+
+// Prevent parameter pollution
 app.use(
   hpp({
-    whitelist: ['duration', 'ratingsAverage'],
+    whitelist: [
+      'duration',
+      'ratingsAverage',
+      'ratingsQuantity',
+      'maxGroupSize',
+      'difficulty',
+      'price',
+    ],
   })
 );
 
-app.use('/api', limiter);
+// Compression
+app.use(compression());
 
-app.use(express.json());
-
+// Test middleware
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
   next();
 });
 
+// Routes
 app.use('/api/v1/tours', tourRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/reviews', reviewsRouter);
 app.use('/api/v1/bookings', bookingRouter);
 
+// Handling unhandled routes
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
-// error handling middleware....
-
+// Global error handling middleware
 app.use(globalErrorHandler);
 
 module.exports = app;
